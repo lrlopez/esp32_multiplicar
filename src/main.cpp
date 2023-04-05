@@ -6,6 +6,8 @@
 #include "Open_Sans_Regular_32.h"
 #include "Open_Sans_Regular_24.h"
 #include "Open_Sans_Regular_16.h"
+#include "Open_Sans_Regular_10.h"
+#include "Open_Sans_Light_8.h"
 #include <Preferences.h>
 
 #define SDA 4
@@ -32,7 +34,7 @@ SSD1306 display(0x3c, SDA, SCL);
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 MelodyPlayer player(BUZZER_PIN, 0, LOW);
 
-char texto[20] = "?x?=??";
+char texto[20];
 
 int op1;
 int op2;
@@ -43,15 +45,87 @@ int maxDigitos;
 int puntos = 0;
 int record = 0;
 
+int tablas[10];
+int tiempo = 0;
+int tipo = 0;
+int tipoActual = 0;
+int configurando = 0;
+int secuencia = 0;
+int tiempoRestante = 0;
+
 void nuevaPrueba() {
-    op1 = random(1, 11);
-    op2 = random(1, op1 == 10 ? 10 : 11);
-    maxDigitos = op1 * op2 < 10 ? 1 : 2;
-    if (op1 * op2 > 100) maxDigitos++;
+    tiempoRestante = tiempo;
+
+    int solucion;
+    if (tipo == 3) {
+        tipoActual = random(2);
+    } else if (tipo == 4) {
+        tipoActual = random(3);
+    } else {
+        tipoActual = tipo;
+    }
+    switch (tipoActual) {
+        // A x B == C
+        case 0:
+            // A: Seleccionar una tabla permitida al azar
+            do {
+                op1 = random(1, 11);
+            } while (tablas[op1 - 1] == 1);
+            // B: Elegir un número del 1 al 10, salvo para
+            // la tabla del 10, que el máximo es 9
+            op2 = random(1, op1 == 10 ? 10 : 11);
+            // C es la solución a averiguar
+            solucion = op1 * op2;
+            break;
+        case 1:
+            // A: Seleccionar una tabla permitida al azar
+            do {
+                op1 = random(1, 11);
+            } while (tablas[op1 - 1] == 1);
+            // B: es la solución a averiguar. Un número del 1 al 10,
+            // salvo para la tabla del 10, que el máximo es 9
+            solucion = random(1, op1 == 10 ? 10 : 11);
+            // C: Resultado de multiplicar A por B
+            op2 = op1 * solucion;
+            break;
+        default:
+            // A: Es la solución a averiguar. Un número del 1 al 10
+            do {
+                solucion = random(1, 11);
+            } while (tablas[solucion - 1] == 1);
+            // B: Elegir un número del 1 al 10, salvo para
+            // la tabla del 10, que el máximo es 9
+            op1 = random(1, solucion == 10 ? 10 : 11);
+            // C: Resultado de multiplicar A por B
+            op2 = op1 * solucion;
+            break;
+    }
+    maxDigitos = solucion < 10 ? 1 : 2;
+    if (solucion >= 100) maxDigitos++;
+
     numDigitos = 0;
     num = 0;
+}
 
-    Serial.printf("%d x %d = %d\n", op1, op2, op1 * op2);
+void procesaSecuencia(char key) {
+    switch (secuencia) {
+        case 0:
+            secuencia = (key == 'A') ? 1 : 0;
+            break;
+        case 1:
+            secuencia = (key == 'C') ? 2 : 0;
+            break;
+        case 2:
+            secuencia = (key == 'A') ? 3 : 0;
+            break;
+        case 3:
+            secuencia = (key == 'B') ? 4 : 0;
+            break;
+        case 4:
+            configurando = (key == 'A') ? 1 : 0;
+            secuencia = 0;
+            break;
+    }
 }
 
 void dibujarPuntos() {
@@ -75,17 +149,38 @@ void ganar() {
     player.play(melody);
 }
 
+void compruebaDelay(int delayOrig) {
+    for (int j = 0; j < delayOrig / 50; j++) {
+        char key = keypad.getKey();
+        if (key != 0) procesaSecuencia(key);
+        delay(50);
+    }
+}
+
 void perder() {
     const char* loseMelody = "start:d=4,o=4,b=100: 1c";
     const char* recordMelody = "start:d=4,o=4,b=300: 8c,8e,8g,4c5,8p,8g,4c5";
-    int resultado = texto[4] - '0';
-    if (numDigitos == 2) {
-        resultado = resultado * 10 + texto[5] - '0';
-    }
+
     char texto2[20];
 
-    sprintf(texto, "%dx%d<>%d", op1, op2, resultado);
-    sprintf(texto2, "%dx%d=%d", op1, op2, op1 * op2);
+    switch (tipoActual) {
+        case 0:
+            sprintf(texto, "%dx%d<>%d", op1, op2, num);
+            sprintf(texto2, "%dx%d=%d", op1, op2, op1 * op2);
+            break;
+        case 1:
+            sprintf(texto, "%dx%d<>%d", op1, num, op2);
+            sprintf(texto2, "%dx%d=%d", op1, op2 / op1, op2);
+            break;
+        case 2:
+            sprintf(texto, "%dx%d<>%d", num, op1, op2);
+            sprintf(texto2, "%dx%d=%d", op2 / op1, op1, op2);
+            break;
+    }
+
+    if (tiempoRestante < 0) {
+        strcpy(texto, texto2);
+    }
 
     display.invertDisplay();
     display.clear();
@@ -104,14 +199,14 @@ void perder() {
         display.drawString(0, 0, texto);
         dibujarPuntos();
         display.display();
-        delay(750);
+        compruebaDelay(750);
         display.normalDisplay();
         display.clear();
         display.setFont(Open_Sans_Regular_32);
         display.drawString(0, 0, texto2);
         dibujarPuntos();
         display.display();
-        delay(750);
+        compruebaDelay(750);
     }
 
     display.setFont(Open_Sans_Regular_24);
@@ -123,10 +218,10 @@ void perder() {
         display.display();
         record = puntos;
         melody = MelodyFactory.loadRtttlString(recordMelody);
-        /*player.play(melody);
+        player.play(melody);
         preferences.begin("app", false);
         preferences.putInt("record", record);
-        preferences.end();*/
+        preferences.end();
     } else {
         display.setFont(Open_Sans_Regular_16);
         sprintf(texto2, "Récord: %d", record);
@@ -134,14 +229,27 @@ void perder() {
         display.display();
     }
 
-    delay(1000);
+    compruebaDelay(1000);
+
     display.setFont(Open_Sans_Regular_32);
 
     puntos = 0;
 }
 
 void comprobar() {
-    if (op1 * op2 == num) {
+    int haGanado;
+    switch (tipoActual) {
+        case 1:
+            haGanado = op1 * num == op2;
+            break;
+        case 2:
+            haGanado = num * op1 == op2;
+            break;
+        default:
+            haGanado = op1 * op2 == num;
+            break;
+    }
+    if (haGanado) {
         ganar();
     } else {
         perder();
@@ -150,25 +258,22 @@ void comprobar() {
 }
 
 void setup() {
-    Serial.begin(115200);
     pinMode(16, OUTPUT);
     digitalWrite(16, HIGH);
 
-    if (keypad.getKey() == 'C') {
-        /*preferences.begin("app", false);
-        preferences.clear();
-        preferences.end();
-        Serial.print("Borradas preferencias");*/
-    }
-
-    /*preferences.begin("app", true);
+    preferences.begin("app", false);
     record = preferences.getInt("record", 0);
-    Serial.print("Cargadas preferencias");
-    preferences.end();*/
+    tiempo = preferences.getInt("tiempo", 0);
+    tipo = preferences.getInt("tipo", 0);
+    for (int i = 0; i < 10; i++) {
+        char nombre[9] = "tablas";
+        itoa(i + 1, &nombre[6], 10);
+        tablas[i] = preferences.getInt(nombre, 0);
+    }
+    preferences.end();
 
     display.init();
-    //display.invertDisplay();
-
+    digitalWrite(16, HIGH);
     randomSeed(analogRead(0));
     nuevaPrueba();
 
@@ -195,47 +300,172 @@ void setup() {
 const char* click = "start:d=32,o=4,b=800: g,p";
 Melody clickMelody = MelodyFactory.loadRtttlString(click);
 
+void dibujarTiempo() {
+    if (tiempo == 0) return;
+    int altura = 64 * tiempoRestante / tiempo;
+    display.fillRect(124, 64 - altura, 4, altura);
+}
+
 void dibujarTexto() {
     display.clear();
     display.setFont(Open_Sans_Regular_32);
-    if (numDigitos == 0) {
-        sprintf(texto, "%dx%d=?", op1, op2);
-    } else {
-        sprintf(texto, "%dx%d=%d", op1, op2, num);
+
+    switch (tipoActual) {
+        case 0:
+            if (numDigitos == 0) {
+                sprintf(texto, "%dx%d=?", op1, op2);
+            } else {
+                sprintf(texto, "%dx%d=%d", op1, op2, num);
+            }
+            if (maxDigitos > 1 && num < 10) strcat(texto, "?");
+            if (maxDigitos > 2 && num < 100) strcat(texto, "?");
+            break;
+        case 1:
+            if (numDigitos == 0) {
+                sprintf(texto, "%dx?", op1);
+            } else {
+                sprintf(texto, "%dx%d", op1, num);
+            }
+            if (maxDigitos > 1 && num < 10) strcat(texto, "?");
+            if (maxDigitos > 2 && num < 100) strcat(texto, "?");
+            sprintf(&texto[strlen(texto)], "=%d", op2);
+            break;
+        case 2:
+            if (numDigitos == 0) {
+                strcpy(texto, "?");
+            } else {
+                sprintf(texto, "%d", num);
+            }
+            if (maxDigitos > 1 && num < 10) strcat(texto, "?");
+            if (maxDigitos > 2 && num < 100) strcat(texto, "?");
+            sprintf(&texto[strlen(texto)], "x%d=%d", op1, op2);
+            break;
     }
-    if (maxDigitos > 1 && num < 10) strcat(texto, "?");
-    if (maxDigitos > 2 && num < 100) strcat(texto, "?");
     display.drawString(0, 0, texto);
     dibujarPuntos();
+    dibujarTiempo();
     display.display();
 }
 
+void dibujarConfiguracion() {
+    display.clear();
+    display.setFont(Open_Sans_Regular_16);
+    char cadena[20];
+    for (int i = 0; i < 10; i++) {
+        itoa(i + 1, cadena, 10);
+        if (tablas[i] == 0) display.drawString(12 * i, 0, cadena);
+    }
+    switch (tipo) {
+        case 0:
+            display.drawString(0, 16, "AxB = ?");
+            break;
+        case 1:
+            display.drawString(0, 16, "Ax? = C");
+            break;
+        case 2:
+            display.drawString(0, 16, "?xB = C");
+            break;
+        case 3:
+            display.drawString(0, 16, "Ax? = ?");
+            break;
+        case 4:
+            display.drawString(0, 16, "?x? = ?");
+            break;
+    }
+    display.setFont(Open_Sans_Regular_10);
+    if (tiempo == 0) {
+        display.drawString(0, 33, "Sin tiempo");
+    } else {
+        sprintf(cadena, "Tiempo máx %d s.", tiempo / 1000);
+        display.drawString(0, 33, cadena);
+    }
+    display.setFont(Open_Sans_Light_8);
+    display.drawString(0, 45, "[A] Tipo [B] Tiempo [C] Descartar");
+    display.drawString(0, 54, "[D] Guardar [*] Reiniciar récord");
+    display.display();
+}
+
+
+
 void loop() {
     char key;
+    int ultAltura = -1;
 
-    dibujarTexto();
+    if (configurando == 0) {
+        dibujarTexto();
+        while ((key = keypad.getKey()) == 0) {
+            if (tiempo > 0) {
+                int altura = 64 * tiempoRestante / tiempo;
+                if (altura != ultAltura) {
+                    dibujarTexto();
+                    ultAltura = altura;
+                }
+                tiempoRestante -= 50;
+                if (tiempoRestante < 0) break;
+            }
+            delay(50);
+        }
 
-    while ((key = keypad.getKey()) == 0) delay(50);
+        if (tiempoRestante < 0) {
+            perder();
+            nuevaPrueba();
+            return;
+        }
 
-    Serial.println(key);
-
-    //if (key == '#' && numDigitos > 0) comprobar();
-    if (key == '*' && numDigitos > 0) {
-        numDigitos--;
-        num = num / 10;
-    }
-    if (key >= '0' && key <= '9' && numDigitos < maxDigitos) {
-        if (numDigitos != 0 || key != '0') {
-            num = num * 10 + key - '0';
-            numDigitos++;
-            player.play(clickMelody);
-            if (numDigitos == maxDigitos) {
-                dibujarTexto();
-                delay(200);
-                comprobar();
-                return;
+        if (key == '*' && numDigitos > 0) {
+            numDigitos--;
+            num = num / 10;
+        } else if (key >= '0' && key <= '9' && numDigitos < maxDigitos) {
+            if (numDigitos != 0 || key != '0') {
+                num = num * 10 + key - '0';
+                numDigitos++;
+                player.play(clickMelody);
+                if (numDigitos == maxDigitos) {
+                    dibujarTexto();
+                    delay(200);
+                    comprobar();
+                    return;
+                }
             }
         }
+        procesaSecuencia(key);
+        while (keypad.getKey() == key) delay(50);
+    } else {
+        dibujarConfiguracion();
+        while ((key = keypad.getKey()) == 0) delay(50);
+        if (key >= '0' && key <= '9') {
+            int indice = key - '0' - 1;
+            if (indice < 0) indice = 9;
+            // Impedir quitar todas
+            int cuenta = 0;
+            for (int i = 0; i < 10; i++) {
+                cuenta += tablas[i];
+            }
+            if (cuenta < 9 || tablas[indice] == 1) {
+                tablas[indice] = 1 - tablas[indice];
+            }
+        } else if (key == 'A') {
+            tipo = (tipo + 1) % 5;
+        } else if (key == 'B') {
+            tiempo = tiempo == 0 ? 10000 : tiempo - 1000;
+            tiempoRestante = tiempo;
+        } else if (key == 'C') {
+            configurando = 0;
+        } else if (key == 'D') {
+            preferences.begin("app", false);
+            preferences.putInt("tipo", tipo);
+            preferences.putInt("tiempo", tiempo);
+            preferences.putInt("record", record);
+            for (int i = 0; i < 10; i++) {
+                char nombre[9] = "tablas";
+                itoa(i + 1, &nombre[6], 10);
+                preferences.putInt(nombre, tablas[i]);
+            }
+            preferences.end();
+            configurando = 0;
+        } else if (key == '*') {
+            record = 0;
+        }
+        while (keypad.getKey() == key) delay(50);
     }
-    while (keypad.getKey() == key) delay(50);
 }
