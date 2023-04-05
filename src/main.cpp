@@ -125,6 +125,8 @@ void procesaSecuencia(char key) {
             configurando = (key == 'A') ? 1 : 0;
             secuencia = 0;
             break;
+        default:
+            secuencia = 0;
     }
 }
 
