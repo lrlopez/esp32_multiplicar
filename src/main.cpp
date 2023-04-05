@@ -289,8 +289,6 @@ void guardarPreferencias() {
 void setup() {
     pinMode(OLED_RST, OUTPUT);
     digitalWrite(OLED_RST, HIGH);
-    pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, LOW);
 
     if (keypad.isPressed('A')) configurando = 1;
 
