@@ -261,14 +261,7 @@ void comprobar() {
     nuevaPrueba();
 }
 
-void setup() {
-    pinMode(OLED_RST, OUTPUT);
-    digitalWrite(OLED_RST, HIGH);
-    pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, LOW);
-
-    if (keypad.isPressed('A')) configurando = 1;
-
+void leerPreferencias() {
     preferences.begin("app", false);
     record = preferences.getInt("record", 0);
     tiempo = preferences.getInt("tiempo", 0);
@@ -279,6 +272,30 @@ void setup() {
         tablas[i] = preferences.getInt(nombre, 0);
     }
     preferences.end();
+}
+
+void guardarPreferencias() {
+    preferences.begin("app", false);
+    preferences.putInt("tipo", tipo);
+    preferences.putInt("tiempo", tiempo);
+    preferences.putInt("record", record);
+    for (int i = 0; i < 10; i++) {
+        char nombre[9] = "tablas";
+        itoa(i + 1, &nombre[6], 10);
+        preferences.putInt(nombre, tablas[i]);
+    }
+    preferences.end();
+}
+
+void setup() {
+    pinMode(OLED_RST, OUTPUT);
+    digitalWrite(OLED_RST, HIGH);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+
+    if (keypad.isPressed('A')) configurando = 1;
+
+    leerPreferencias();
 
     display.init();
     randomSeed(analogRead(0));
@@ -391,8 +408,6 @@ void dibujarConfiguracion() {
     display.display();
 }
 
-
-
 void loop() {
     char key;
     int ultAltura = -1;
@@ -458,16 +473,7 @@ void loop() {
         } else if (key == 'C') {
             configurando = 0;
         } else if (key == 'D') {
-            preferences.begin("app", false);
-            preferences.putInt("tipo", tipo);
-            preferences.putInt("tiempo", tiempo);
-            preferences.putInt("record", record);
-            for (int i = 0; i < 10; i++) {
-                char nombre[9] = "tablas";
-                itoa(i + 1, &nombre[6], 10);
-                preferences.putInt(nombre, tablas[i]);
-            }
-            preferences.end();
+            guardarPreferencias();
             configurando = 0;
         } else if (key == '*') {
             record = 0;
