@@ -7,7 +7,6 @@
 #include "Open_Sans_Regular_24.h"
 #include "Open_Sans_Regular_16.h"
 #include "Open_Sans_Regular_10.h"
-#include "Open_Sans_Light_8.h"
 #include <Preferences.h>
 
 #define OLED_SDA 4
