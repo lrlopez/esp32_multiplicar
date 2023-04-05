@@ -10,9 +10,11 @@
 #include "Open_Sans_Light_8.h"
 #include <Preferences.h>
 
-#define SDA 4
-#define SCL 15
+#define OLED_SDA 4
+#define OLED_SCL 15
+#define OLED_RST 16
 #define BUZZER_PIN 21
+#define LED_PIN 25
 
 const byte ROWS = 4; //four rows
 const byte COLS = 4; //four columns
@@ -30,7 +32,7 @@ byte colPins[COLS] = {27, 14, 12, 13};
 
 Preferences preferences;
 
-SSD1306 display(0x3c, SDA, SCL);
+SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 MelodyPlayer player(BUZZER_PIN, 0, LOW);
 
@@ -260,10 +262,12 @@ void comprobar() {
 }
 
 void setup() {
-    pinMode(16, OUTPUT);
-    digitalWrite(16, HIGH);
+    pinMode(OLED_RST, OUTPUT);
+    digitalWrite(OLED_RST, HIGH);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
 
-    if (keypad.getKey() == 'A') configurando = 1;
+    if (keypad.isPressed('A')) configurando = 1;
 
     preferences.begin("app", false);
     record = preferences.getInt("record", 0);
@@ -277,7 +281,6 @@ void setup() {
     preferences.end();
 
     display.init();
-    digitalWrite(16, HIGH);
     randomSeed(analogRead(0));
     nuevaPrueba();
 
