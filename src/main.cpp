@@ -263,6 +263,8 @@ void setup() {
     pinMode(16, OUTPUT);
     digitalWrite(16, HIGH);
 
+    if (keypad.getKey() == 'A') configurando = 1;
+
     preferences.begin("app", false);
     record = preferences.getInt("record", 0);
     tiempo = preferences.getInt("tiempo", 0);
@@ -374,16 +376,15 @@ void dibujarConfiguracion() {
             display.drawString(0, 16, "?x? = ?");
             break;
     }
-    display.setFont(Open_Sans_Regular_10);
     if (tiempo == 0) {
-        display.drawString(0, 33, "Sin tiempo");
+        display.drawString(64, 16, "-- s.");
     } else {
-        sprintf(cadena, "Tiempo máx %d s.", tiempo / 1000);
-        display.drawString(0, 33, cadena);
+        sprintf(cadena, "%d s.", tiempo / 1000);
+        display.drawString(64, 16, cadena);
     }
-    display.setFont(Open_Sans_Light_8);
-    display.drawString(0, 45, "[A] Tipo [B] Tiempo [C] Descartar");
-    display.drawString(0, 54, "[D] Guardar [*] Reiniciar récord");
+    display.setFont(Open_Sans_Regular_10);
+    display.drawString(0, 36, "A] Tipo B] Tiempo C] Salir");
+    display.drawString(0, 48, "D] Guardar *] Récord a 0");
     display.display();
 }
 
