@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <SSD1306.h>
 #include <Keypad.h>
+#include <iterator>
 #include <melody_player.h>
 #include <melody_factory.h>
 #include "Open_Sans_Regular_32.h"
@@ -13,7 +14,6 @@
 #define OLED_SCL 15
 #define OLED_RST 16
 #define BUZZER_PIN 21
-#define LED_PIN 25
 
 const byte ROWS = 4; //four rows
 const byte COLS = 4; //four columns
@@ -47,12 +47,22 @@ int puntos = 0;
 int record = 0;
 
 int tablas[10];
+int resultado[10][10] = {};
+
 int tiempo = 0;
 int tipo = 0;
 int tipoActual = 0;
 int configurando = 0;
 int secuencia = 0;
 int tiempoRestante = 0;
+
+void reiniciar() {
+    for (int i = 0; i < 10; ++i) {
+        for (int j = 0; j < 10; ++j) {
+            resultado[i][j] = 0;
+        }
+    }
+}
 
 void nuevaPrueba() {
     tiempoRestante = tiempo;
@@ -65,6 +75,17 @@ void nuevaPrueba() {
     } else {
         tipoActual = tipo;
     }
+    int total = 0;
+    for (int i = 0; i < 10; ++i) {
+        if (tablas[i] == 0) {
+            for (int j = 0; j < 10; ++j) {
+                total += (resultado[i][j] == 0) ? 1 : 0;
+            }
+        }
+    }
+    if (total == 0) {
+        reiniciar();
+    }
     switch (tipoActual) {
         // A x B == C
         case 0:
@@ -74,7 +95,10 @@ void nuevaPrueba() {
             } while (tablas[op1 - 1] == 1);
             // B: Elegir un número del 1 al 10, salvo para
             // la tabla del 10, que el máximo es 9
-            op2 = random(1, op1 == 10 ? 10 : 11);
+            // (evitar los números acertados)
+            do {
+                op2 = random(1, op1 == 10 ? 10 : 11);
+            } while (resultado[op1 - 1][op2 - 1] == 1);
             // C es la solución a averiguar
             solucion = op1 * op2;
             break;
@@ -85,20 +109,24 @@ void nuevaPrueba() {
             } while (tablas[op1 - 1] == 1);
             // B: es la solución a averiguar. Un número del 1 al 10,
             // salvo para la tabla del 10, que el máximo es 9
-            solucion = random(1, op1 == 10 ? 10 : 11);
-            // C: Resultado de multiplicar A por B
-            op2 = op1 * solucion;
+            do {
+                solucion = random(1, op1 == 10 ? 10 : 11);
+                // C: Resultado de multiplicar A por B
+                op2 = op1 * solucion;
+            } while (resultado[op1 - 1][solucion - 1] == 1);
             break;
         default:
             // A: Es la solución a averiguar. Un número del 1 al 10
             do {
-                solucion = random(1, 11);
-            } while (tablas[solucion - 1] == 1);
-            // B: Elegir un número del 1 al 10, salvo para
-            // la tabla del 10, que el máximo es 9
-            op1 = random(1, solucion == 10 ? 10 : 11);
-            // C: Resultado de multiplicar A por B
-            op2 = op1 * solucion;
+                do {
+                    solucion = random(1, 11);
+                } while (tablas[solucion - 1] == 1);
+                // B: Elegir un número del 1 al 10, salvo para
+                // la tabla del 10, que el máximo es 9
+                op1 = random(1, solucion == 10 ? 10 : 11);
+                // C: Resultado de multiplicar A por B
+                op2 = op1 * solucion;
+            } while (resultado[op1 - 1][solucion - 1] == 1);
             break;
     }
     maxDigitos = solucion < 10 ? 1 : 2;
@@ -237,6 +265,7 @@ void perder() {
     display.setFont(Open_Sans_Regular_32);
 
     puntos = 0;
+    reiniciar();
 }
 
 void comprobar() {
@@ -244,12 +273,21 @@ void comprobar() {
     switch (tipoActual) {
         case 1:
             haGanado = op1 * num == op2;
+            if (haGanado) {
+                resultado[op1 - 1][num - 1] = 1;
+            }
             break;
         case 2:
             haGanado = num * op1 == op2;
+            if (haGanado) {
+                resultado[num - 1][op1 - 1] = 1;
+            }
             break;
         default:
             haGanado = op1 * op2 == num;
+            if (haGanado) {
+                resultado[op1 - 1][op2 - 1] = 1;
+            }
             break;
     }
     if (haGanado) {
@@ -287,8 +325,10 @@ void guardarPreferencias() {
 }
 
 void setup() {
+#ifdef OLED_RST
     pinMode(OLED_RST, OUTPUT);
     digitalWrite(OLED_RST, HIGH);
+#endif
 
     if (keypad.isPressed('A')) configurando = 1;
 
@@ -462,8 +502,10 @@ void loop() {
             if (cuenta < 9 || tablas[indice] == 1) {
                 tablas[indice] = 1 - tablas[indice];
             }
+            reiniciar();
         } else if (key == 'A') {
             tipo = (tipo + 1) % 5;
+            reiniciar();
         } else if (key == 'B') {
             tiempo = tiempo == 0 ? 10000 : tiempo - 1000;
             tiempoRestante = tiempo;
