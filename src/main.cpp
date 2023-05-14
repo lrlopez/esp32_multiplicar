@@ -1,18 +1,14 @@
 #include <Wire.h>
-#include <SSD1306.h>
 #include <Keypad.h>
 #include <iterator>
 #include <melody_player.h>
 #include <melody_factory.h>
-#include "Open_Sans_Regular_32.h"
-#include "Open_Sans_Regular_24.h"
-#include "Open_Sans_Regular_16.h"
-#include "Open_Sans_Regular_10.h"
+#include "U8g2lib.h"
 #include <Preferences.h>
 
-#define OLED_SDA 4
-#define OLED_SCL 15
-#define OLED_RST 16
+#define OLED_SDA 22
+#define OLED_SCL 23
+//#define OLED_RST 16
 #define BUZZER_PIN 21
 
 const byte ROWS = 4; //four rows
@@ -26,12 +22,12 @@ char keys[ROWS][COLS] = {
 };
 
 // For ESP32 Microcontroller
-byte rowPins[ROWS] = {32, 33, 25, 26};
-byte colPins[COLS] = {27, 14, 12, 13};
+byte rowPins[ROWS] = {14, 27, 26, 25};
+byte colPins[COLS] = {16, 17, 5, 18};
 
 Preferences preferences;
 
-SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
+U8G2_ST7567_ENH_DG128064I_F_SW_I2C display(U8G2_R0, OLED_SCL, OLED_SDA, U8X8_PIN_NONE);
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 MelodyPlayer player(BUZZER_PIN, 0, LOW);
 
@@ -52,7 +48,7 @@ int resultado[10][10] = {};
 int tiempo = 0;
 int tipo = 0;
 int tipoActual = 0;
-int configurando = 0;
+int configurando = 1;
 int secuencia = 0;
 int tiempoRestante = 0;
 
@@ -157,24 +153,29 @@ void procesaSecuencia(char key) {
         default:
             secuencia = 0;
     }
+    /*char texto2[100];
+    display.setFont(u8g2_font_profont10_mf);
+    sprintf(texto2, "%d", secuencia);
+    display.drawStr(120, 63, texto2);
+    display.sendBuffer();*/
 }
 
 void dibujarPuntos() {
     char texto2[100];
-    display.setFont(Open_Sans_Regular_16);
+    display.setFont(u8g2_font_helvB14_tf);
     sprintf(texto2, "Ptos %d / %d", puntos, record);
-    display.drawString(0, 44, texto2);
+    display.drawStr(0, 63, texto2);
 }
 
 void ganar() {
     const char* winMelody = "start:d=4,o=6,b=200: 8c, 8e, 4g";
 
     puntos++;
-    display.clear();
-    display.setFont(Open_Sans_Regular_32);
-    display.drawString(0, 0, "¡Bien!");
+    display.clearBuffer();
+    display.setFont(u8g2_font_helvB18_tf);
+    display.drawUTF8(0, 31, "¡Bien!");
     dibujarPuntos();
-    display.display();
+    display.sendBuffer();
 
     Melody melody = MelodyFactory.loadRtttlString(winMelody);
     player.play(melody);
@@ -213,40 +214,40 @@ void perder() {
         strcpy(texto, texto2);
     }
 
-    display.invertDisplay();
-    display.clear();
-    display.setFont(Open_Sans_Regular_32);
-    display.drawString(0, 0, texto);
+    //display.invertDisplay();
+    display.clearBuffer();
+    display.setFont(u8g2_font_helvB18_tf);
+    display.drawStr(0, 31, texto);
     dibujarPuntos();
-    display.display();
+    display.sendBuffer();
 
     Melody melody = MelodyFactory.loadRtttlString(loseMelody);
     player.play(melody);
 
     for (int i = 0; i < 3; i++) {
-        display.invertDisplay();
-        display.clear();
-        display.setFont(Open_Sans_Regular_32);
-        display.drawString(0, 0, texto);
+        //display.invertDisplay();
+        display.clearBuffer();
+        display.setFont(u8g2_font_helvB18_tf);
+        display.drawStr(0, 31, texto);
         dibujarPuntos();
-        display.display();
+        display.sendBuffer();
         compruebaDelay(750);
-        display.normalDisplay();
-        display.clear();
-        display.setFont(Open_Sans_Regular_32);
-        display.drawString(0, 0, texto2);
+        //display.normalDisplay();
+        display.clearBuffer();
+        display.setFont(u8g2_font_helvB18_tf);
+        display.drawStr(0, 31, texto2);
         dibujarPuntos();
-        display.display();
+        display.sendBuffer();
         compruebaDelay(750);
     }
 
-    display.setFont(Open_Sans_Regular_24);
+    display.setFont(u8g2_font_logisoso24_tf);
     sprintf(texto2, "Ptos. %d", puntos);
-    display.clear();
-    display.drawString(0, 0, texto2);
+    display.clearBuffer();
+    display.drawStr(0, 31, texto2);
     if (puntos > record) {
-        display.drawString(0, 32, "¡Record!");
-        display.display();
+        display.drawStr(0, 63, "¡Record!");
+        display.sendBuffer();
         record = puntos;
         melody = MelodyFactory.loadRtttlString(recordMelody);
         player.play(melody);
@@ -254,15 +255,15 @@ void perder() {
         preferences.putInt("record", record);
         preferences.end();
     } else {
-        display.setFont(Open_Sans_Regular_16);
+        display.setFont(u8g2_font_helvB14_tf);
         sprintf(texto2, "Récord: %d", record);
-        display.drawString(0, 44, texto2);
-        display.display();
+        display.drawUTF8(0, 63, texto2);
+        display.sendBuffer();
     }
 
     compruebaDelay(1000);
 
-    display.setFont(Open_Sans_Regular_32);
+    display.setFont(u8g2_font_helvB18_tf);
 
     puntos = 0;
     reiniciar();
@@ -329,23 +330,29 @@ void setup() {
     pinMode(OLED_RST, OUTPUT);
     digitalWrite(OLED_RST, HIGH);
 #endif
+    display.enableUTF8Print();
 
     if (keypad.isPressed('A')) configurando = 1;
 
     leerPreferencias();
 
-    display.init();
+    display.setI2CAddress(0x3F * 2);
+    display.enableUTF8Print();
+    display.begin();
+    display.clearBuffer();
+    display.sendBuffer();
+
     randomSeed(analogRead(0));
     nuevaPrueba();
 
     const char* startMelody = "aadams:d=4,o=5,b=180:8c,f,8a,f,8c,b4,2g,8f,e,8g,e,8e4,a4,2f,8c,f,8a,f,8c,b4,2g,8f,e,8c,d,8e,1f,8c,8d,8e,8f,1p,8d,8e,8f#,8g,1p,8d,8e,8f#,8g,p,8d,8e,8f#,8g,p,8c,8d,8e,8f";
 
-    display.clear();
-    display.setFont(Open_Sans_Regular_16);
-    display.drawString(0, 0, "¡Bienvenido");
-    display.drawString(0, 22, "a las tablas de");
-    display.drawString(0, 44, "multiplicar!");
-    display.display();
+    display.clearBuffer();
+    display.setFont(u8g2_font_helvB18_tf);
+    display.drawUTF8(0, 21, "¡Bienvenido");
+    display.drawStr(0, 42, "a las tablas de");
+    display.drawStr(0, 63, "multiplicar!");
+    display.sendBuffer();
 
     Melody melody = MelodyFactory.loadRtttlString(startMelody);
     player.playAsync(melody);
@@ -364,12 +371,12 @@ Melody clickMelody = MelodyFactory.loadRtttlString(click);
 void dibujarTiempo() {
     if (tiempo == 0) return;
     int altura = 64 * tiempoRestante / tiempo;
-    display.fillRect(124, 64 - altura, 4, altura);
+    display.drawBox(124, 64 - altura, 4, altura);
 }
 
 void dibujarTexto() {
-    display.clear();
-    display.setFont(Open_Sans_Regular_32);
+    display.clearBuffer();
+    display.setFont(u8g2_font_helvB18_tf);
 
     switch (tipoActual) {
         case 0:
@@ -402,47 +409,47 @@ void dibujarTexto() {
             sprintf(&texto[strlen(texto)], "x%d=%d", op1, op2);
             break;
     }
-    display.drawString(0, 0, texto);
+    display.drawStr(0, 31, texto);
     dibujarPuntos();
     dibujarTiempo();
-    display.display();
+    display.sendBuffer();
 }
 
 void dibujarConfiguracion() {
-    display.clear();
-    display.setFont(Open_Sans_Regular_16);
+    display.clearBuffer();
+    display.setFont(u8g2_font_logisoso16_tf);
     char cadena[20];
     for (int i = 0; i < 10; i++) {
         itoa(i + 1, cadena, 10);
-        if (tablas[i] == 0) display.drawString(12 * i, 0, cadena);
+        if (tablas[i] == 0) display.drawStr(12 * i, 16, cadena);
     }
     switch (tipo) {
         case 0:
-            display.drawString(0, 16, "AxB = ?");
+            display.drawStr(0, 33, "AxB=?");
             break;
         case 1:
-            display.drawString(0, 16, "Ax? = C");
+            display.drawStr(0, 33, "Ax?=C");
             break;
         case 2:
-            display.drawString(0, 16, "?xB = C");
+            display.drawStr(0, 33, "?xB=C");
             break;
         case 3:
-            display.drawString(0, 16, "Ax? = ?");
+            display.drawStr(0, 33, "Ax?=?");
             break;
         case 4:
-            display.drawString(0, 16, "?x? = ?");
+            display.drawStr(0, 33, "?x?=?");
             break;
     }
     if (tiempo == 0) {
-        display.drawString(64, 16, "-- s.");
+        display.drawStr(72, 33, "-- s.");
     } else {
         sprintf(cadena, "%d s.", tiempo / 1000);
-        display.drawString(64, 16, cadena);
+        display.drawStr(72, 33, cadena);
     }
-    display.setFont(Open_Sans_Regular_10);
-    display.drawString(0, 36, "A] Tipo B] Tiempo C] Salir");
-    display.drawString(0, 48, "D] Guardar *] Récord a 0");
-    display.display();
+    display.setFont(u8g2_font_profont10_mf);
+    display.drawUTF8(0, 49, "A] Tipo B] Tiempo C] Salir");
+    display.drawUTF8(0, 61, "D] Guardar *] Récord a 0");
+    display.sendBuffer();
 }
 
 void loop() {
